@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <pthread.h>
+
+int ***pixels;
 
 typedef struct InputArgsData {
   char *num_threads;
@@ -61,7 +64,7 @@ ImageInfo *processImageInfo() {
 }
 
 int ***allocatePixels(ImageInfo *imageInfo) {
-  int ***pixels = (int ***) malloc(sizeof(int **) * imageInfo->rows);
+  pixels = (int ***) malloc(sizeof(int **) * imageInfo->rows);
   for (int r = 0; r < imageInfo->rows; r++) {
     pixels[r] = (int **) malloc(sizeof(int*) * imageInfo->columns);
     for (int c = 0; c < imageInfo->columns; c++) {
@@ -72,7 +75,7 @@ int ***allocatePixels(ImageInfo *imageInfo) {
 }
 
 int ***processPixels(ImageInfo *imageInfo) {
-  int ***pixels = allocatePixels(imageInfo);
+  pixels = allocatePixels(imageInfo);
 
   for (int r = 0; r < imageInfo->rows; r++) {
     for (int c = 0; c < imageInfo->columns; c++) {
@@ -87,6 +90,68 @@ int ***processPixels(ImageInfo *imageInfo) {
   return pixels;
 }
 
+void outputPixels(int ***pixels, ImageInfo *imageInfo) {
+  printf("%s\n", imageInfo->type);
+  printf("%d %d\n", imageInfo->rows, imageInfo->columns);
+  printf("%d\n", imageInfo->max);
+  for (int r = 0; r < imageInfo->rows; r++) {
+    for (int c = 0; c < imageInfo->columns; c++) {
+        printf("%d %d %d\n", pixels[r][c][0], pixels[r][c][1], pixels[r][c][2]);
+    }
+  }
+}
+
+int ***invertPixels(int ***pixels, ImageInfo *imageInfo) {
+  for (int r = 0; r < imageInfo->rows; r++) {
+    for (int c = 0; c < imageInfo->columns; c++) {
+      for (int p = 0; p < 3; p++) {
+        pixels[r][c][p] = imageInfo->max - pixels[r][c][p];
+      }
+    }
+  }
+  return pixels;
+}
+
+int ***redPixels(int ***pixels, ImageInfo *imageInfo) {
+  for (int r = 0; r < imageInfo->rows; r++) {
+    for (int c = 0; c < imageInfo->columns; c++) {
+      for (int p = 0; p < 3; p++) {
+        if (p != 0) {
+          pixels[r][c][p] = 0;
+        }
+      }
+    }
+  }
+  return pixels;
+}
+
+int ***greenPixels(int ***pixels, ImageInfo *imageInfo) {
+  for (int r = 0; r < imageInfo->rows; r++) {
+    for (int c = 0; c < imageInfo->columns; c++) {
+      for (int p = 0; p < 3; p++) {
+        if (p != 1) {
+          pixels[r][c][p] = 0;
+        }
+      }
+    }
+  }
+  return pixels;
+}
+
+int ***bluePixels(int ***pixels, ImageInfo *imageInfo) {
+  for (int r = 0; r < imageInfo->rows; r++) {
+    for (int c = 0; c < imageInfo->columns; c++) {
+      for (int p = 0; p < 3; p++) {
+        if (p != 2) {
+          pixels[r][c][p] = 0;
+        }
+      }
+    }
+  }
+  return pixels;
+}
+
+
 int main (int argc, char **argv) {
 
   InputArgsData *input = processInputArgs(argc, argv);
@@ -97,10 +162,25 @@ int main (int argc, char **argv) {
   // fread(&image, 1, 100, stdin);
   // fprintf(stderr, "%s\n", image);
 
-  int ***pixels = processPixels(imageInfo);
+  pixels = processPixels(imageInfo);
 
-  
+  if (strcmp(input->option, "-I") == 0) {
+    pixels = invertPixels(pixels, imageInfo);
+  }
+  if (strcmp(input->option, "-C") == 0) {
+    //
+  }
+  if (strcmp(input->option, "-red") == 0) {
+    pixels = redPixels(pixels, imageInfo);
+  }
+  if (strcmp(input->option, "-green") == 0) {
+    pixels = greenPixels(pixels, imageInfo);
+  }
+  if (strcmp(input->option, "-blue") == 0) {
+    pixels = bluePixels(pixels, imageInfo);
+  }
 
+  outputPixels(pixels, imageInfo);
 
   //free pixels
   free(imageInfo);
