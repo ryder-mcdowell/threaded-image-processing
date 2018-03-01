@@ -68,23 +68,24 @@ ImageInfo *processImageInfo() {
   return imageInfo;
 }
 
-int ***allocatePixels(ImageInfo *imageInfo) {
+void allocatePixels(ImageInfo *imageInfo) {
+  int r, c;
   pixels = (int ***) malloc(sizeof(int **) * imageInfo->rows);
-  for (int r = 0; r < imageInfo->rows; r++) {
+  for (r = 0; r < imageInfo->rows; r++) {
     pixels[r] = (int **) malloc(sizeof(int*) * imageInfo->columns);
-    for (int c = 0; c < imageInfo->columns; c++) {
+    for (c = 0; c < imageInfo->columns; c++) {
       pixels[r][c] = (int *) malloc(sizeof(int) * 3);
     }
   }
-  return pixels;
 }
 
-int ***processPixels(ImageInfo *imageInfo) {
-  pixels = allocatePixels(imageInfo);
+void processPixels(ImageInfo *imageInfo) {
+  allocatePixels(imageInfo);
 
-  for (int r = 0; r < imageInfo->rows; r++) {
-    for (int c = 0; c < imageInfo->columns; c++) {
-      for (int p = 0; p < 3; p++) {
+  int r, c, p;
+  for (r = 0; r < imageInfo->rows; r++) {
+    for (c = 0; c < imageInfo->columns; c++) {
+      for (p = 0; p < 3; p++) {
         if (scanf("%d", &pixels[r][c][p]) < 0) {
           perror("SCAN ERROR");
           exit(1);
@@ -92,35 +93,37 @@ int ***processPixels(ImageInfo *imageInfo) {
       }
     }
   }
-  return pixels;
 }
 
-void outputPixels(int ***pixels, ImageInfo *imageInfo) {
+void outputPixels(ImageInfo *imageInfo) {
   printf("%s\n", imageInfo->type);
   printf("%d %d\n", imageInfo->rows, imageInfo->columns);
   printf("%d\n", imageInfo->max);
-  for (int r = 0; r < imageInfo->rows; r++) {
-    for (int c = 0; c < imageInfo->columns; c++) {
+
+  int r, c;
+  for (r = 0; r < imageInfo->rows; r++) {
+    for (c = 0; c < imageInfo->columns; c++) {
         printf("%d %d %d\n", pixels[r][c][0], pixels[r][c][1], pixels[r][c][2]);
     }
   }
 }
 
-int ***invertPixels(int ***pixels, ImageInfo *imageInfo) {
-  for (int r = 0; r < imageInfo->rows; r++) {
-    for (int c = 0; c < imageInfo->columns; c++) {
-      for (int p = 0; p < 3; p++) {
+void invertPixels(ImageInfo *imageInfo) {
+  int r, c, p;
+  for (r = 0; r < imageInfo->rows; r++) {
+    for (c = 0; c < imageInfo->columns; c++) {
+      for (p = 0; p < 3; p++) {
         pixels[r][c][p] = imageInfo->max - pixels[r][c][p];
       }
     }
   }
-  return pixels;
 }
 
-int ***contrastPixels(int ***pixels, ImageInfo *imageInfo, float contrast) {
-  for (int r = 0; r < imageInfo->rows; r++) {
-    for (int c = 0; c < imageInfo->columns; c++) {
-      for (int p = 0; p < 3; p++) {
+void contrastPixels(ImageInfo *imageInfo, float contrast) {
+  int r, c, p;
+  for (r = 0; r < imageInfo->rows; r++) {
+    for (c = 0; c < imageInfo->columns; c++) {
+      for (p = 0; p < 3; p++) {
         if (pixels[r][c][p] <= (imageInfo->max / 2)) {
           pixels[r][c][p] -= imageInfo->max * contrast;
         } else {
@@ -129,48 +132,65 @@ int ***contrastPixels(int ***pixels, ImageInfo *imageInfo, float contrast) {
       }
     }
   }
-  return pixels;
 }
 
-int ***redPixels(int ***pixels, ImageInfo *imageInfo) {
-  for (int r = 0; r < imageInfo->rows; r++) {
-    for (int c = 0; c < imageInfo->columns; c++) {
-      for (int p = 0; p < 3; p++) {
+void redPixels(ImageInfo *imageInfo) {
+  int r, c, p;
+  for (r = 0; r < imageInfo->rows; r++) {
+    for (c = 0; c < imageInfo->columns; c++) {
+      for (p = 0; p < 3; p++) {
         if (p != 0) {
           pixels[r][c][p] = 0;
         }
       }
     }
   }
-  return pixels;
 }
 
-int ***greenPixels(int ***pixels, ImageInfo *imageInfo) {
-  for (int r = 0; r < imageInfo->rows; r++) {
-    for (int c = 0; c < imageInfo->columns; c++) {
-      for (int p = 0; p < 3; p++) {
+void greenPixels(ImageInfo *imageInfo) {
+  int r, c, p;
+  for (r = 0; r < imageInfo->rows; r++) {
+    for (c = 0; c < imageInfo->columns; c++) {
+      for (p = 0; p < 3; p++) {
         if (p != 1) {
           pixels[r][c][p] = 0;
         }
       }
     }
   }
-  return pixels;
 }
 
-int ***bluePixels(int ***pixels, ImageInfo *imageInfo) {
-  for (int r = 0; r < imageInfo->rows; r++) {
-    for (int c = 0; c < imageInfo->columns; c++) {
-      for (int p = 0; p < 3; p++) {
+void bluePixels(ImageInfo *imageInfo) {
+  int r, c, p;
+  for (r = 0; r < imageInfo->rows; r++) {
+    for (c = 0; c < imageInfo->columns; c++) {
+      for (p = 0; p < 3; p++) {
         if (p != 2) {
           pixels[r][c][p] = 0;
         }
       }
     }
   }
-  return pixels;
 }
 
+void freePixels(ImageInfo *imageInfo) {
+  int r, c;
+  for (r = 0; r < imageInfo->rows; r++) {
+    for (c = 0; c < imageInfo->columns; c++) {
+      free(pixels[r][c]);
+    }
+  }
+  for (r = 0; r < imageInfo->rows; r++) {
+    free(pixels[r]);
+  }
+  free(pixels);
+}
+
+void freeMemory(ImageInfo *imageInfo, InputArgsData *input) {
+  freePixels(imageInfo);
+  free(imageInfo);
+  free(input);
+}
 
 int main (int argc, char **argv) {
 
@@ -182,29 +202,27 @@ int main (int argc, char **argv) {
   // fread(&image, 1, 100, stdin);
   // fprintf(stderr, "%s\n", image);
 
-  pixels = processPixels(imageInfo);
+  processPixels(imageInfo);
 
   if (strcmp(input->option, "-I") == 0) {
-    pixels = invertPixels(pixels, imageInfo);
+    invertPixels(imageInfo);
   }
   if (strcmp(input->option, "-C") == 0) {
-    pixels = contrastPixels(pixels, imageInfo, input->contrast);
+    contrastPixels(imageInfo, input->contrast);
   }
   if (strcmp(input->option, "-red") == 0) {
-    pixels = redPixels(pixels, imageInfo);
+    redPixels(imageInfo);
   }
   if (strcmp(input->option, "-green") == 0) {
-    pixels = greenPixels(pixels, imageInfo);
+    greenPixels(imageInfo);
   }
   if (strcmp(input->option, "-blue") == 0) {
-    pixels = bluePixels(pixels, imageInfo);
+    bluePixels(imageInfo);
   }
 
-  outputPixels(pixels, imageInfo);
+  outputPixels(imageInfo);
 
-  //free pixels
-  free(imageInfo);
-  free(input);
+  freeMemory(imageInfo, input);
 
   return 0;
 }
