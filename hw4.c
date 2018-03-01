@@ -7,9 +7,9 @@
 int ***pixels;
 
 typedef struct InputArgsData {
-  char *num_threads;
+  int num_threads;
   char *option;
-  char *contrast;
+  float contrast;
 } InputArgsData;
 
 typedef struct ImageInfo {
@@ -25,10 +25,15 @@ InputArgsData *processInputArgs(int argc, char **argv) {
     exit(1);
   } else {
     InputArgsData *input = (InputArgsData *) malloc(sizeof(InputArgsData));
-    input->num_threads = argv[1];
+    input->num_threads = atoi(argv[1]);
     input->option = argv[2];
     if (argc == 4) {
-      input->contrast = argv[3];
+      if (atof(argv[3]) > 0 && atof(argv[3]) < 1) {
+        input->contrast = atof(argv[3]);
+      } else {
+        fprintf(stderr, "ERROR: contrast value must be between 0 and 1\n");
+        exit(1);
+      }
     }
     return input;
   }
@@ -112,6 +117,21 @@ int ***invertPixels(int ***pixels, ImageInfo *imageInfo) {
   return pixels;
 }
 
+int ***contrastPixels(int ***pixels, ImageInfo *imageInfo, float contrast) {
+  for (int r = 0; r < imageInfo->rows; r++) {
+    for (int c = 0; c < imageInfo->columns; c++) {
+      for (int p = 0; p < 3; p++) {
+        if (pixels[r][c][p] <= (imageInfo->max / 2)) {
+          pixels[r][c][p] -= imageInfo->max * contrast;
+        } else {
+          pixels[r][c][p] += imageInfo->max * contrast;
+        }
+      }
+    }
+  }
+  return pixels;
+}
+
 int ***redPixels(int ***pixels, ImageInfo *imageInfo) {
   for (int r = 0; r < imageInfo->rows; r++) {
     for (int c = 0; c < imageInfo->columns; c++) {
@@ -168,7 +188,7 @@ int main (int argc, char **argv) {
     pixels = invertPixels(pixels, imageInfo);
   }
   if (strcmp(input->option, "-C") == 0) {
-    //
+    pixels = contrastPixels(pixels, imageInfo, input->contrast);
   }
   if (strcmp(input->option, "-red") == 0) {
     pixels = redPixels(pixels, imageInfo);
@@ -187,6 +207,4 @@ int main (int argc, char **argv) {
   free(input);
 
   return 0;
-
-
 }
