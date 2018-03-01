@@ -4,27 +4,36 @@
 #include <string.h>
 #include <pthread.h>
 
-int ***pixels;
+#define TRUE 1
+#define FALSE 0
 
-typedef struct InputArgsData {
+int ***pixels;
+int ***pixelsRotated;
+
+typedef struct InputArgs {
   int num_threads;
   char *option;
   float contrast;
-} InputArgsData;
+} InputArgs;
 
 typedef struct ImageInfo {
   char type[10];
   int rows;
   int columns;
   int max;
+  int rotated;
 } ImageInfo;
 
-InputArgsData *processInputArgs(int argc, char **argv) {
+typedef struct ThreadSegment {
+
+} ThreadSegment;
+
+InputArgs *processInputArgs(int argc, char **argv) {
   if (argc < 3 || argc > 4) {
     fprintf(stderr, "usage: ./a.out num_threads option [arg]\n");
     exit(1);
   } else {
-    InputArgsData *input = (InputArgsData *) malloc(sizeof(InputArgsData));
+    InputArgs *input = (InputArgs *) malloc(sizeof(InputArgs));
     input->num_threads = atoi(argv[1]);
     input->option = argv[2];
     if (argc == 4) {
@@ -47,11 +56,11 @@ ImageInfo *processImageInfo() {
     perror("SCANF ERROR");
     exit(1);
   }
-  if (scanf("%d", &imageInfo->rows) < 0) {
+  if (scanf("%d", &imageInfo->columns) < 0) {
     perror("SCANF ERROR");
     exit(1);
   }
-  if (scanf("%d", &imageInfo->columns) < 0) {
+  if (scanf("%d", &imageInfo->rows) < 0) {
     perror("SCANF ERROR");
     exit(1);
   }
@@ -59,10 +68,11 @@ ImageInfo *processImageInfo() {
     perror("SCANF ERROR");
     exit(1);
   }
+  imageInfo->rotated = FALSE;
 
   fprintf(stderr, "Image Type: %s\n", imageInfo->type);
+  fprintf(stderr, "Image Columns: %d\n", imageInfo->columns);
   fprintf(stderr, "Image Rows: %d\n", imageInfo->rows);
-  fprintf(stderr, "Image Colums: %d\n", imageInfo->columns);
   fprintf(stderr, "Image Max: %d\n", imageInfo->max);
 
   return imageInfo;
@@ -75,6 +85,17 @@ void allocatePixels(ImageInfo *imageInfo) {
     pixels[r] = (int **) malloc(sizeof(int*) * imageInfo->columns);
     for (c = 0; c < imageInfo->columns; c++) {
       pixels[r][c] = (int *) malloc(sizeof(int) * 3);
+    }
+  }
+}
+
+void allocatePixelsRotated(ImageInfo *imageInfo) {
+  int r, c;
+  pixelsRotated = (int ***) malloc(sizeof(int **) * imageInfo->columns);
+  for (r = 0; r < imageInfo->columns; r++) {
+    pixelsRotated[r] = (int **) malloc(sizeof(int*) * imageInfo->rows);
+    for (c = 0; c < imageInfo->rows; c++) {
+      pixelsRotated[r][c] = (int *) malloc(sizeof(int) * 3);
     }
   }
 }
@@ -97,13 +118,26 @@ void processPixels(ImageInfo *imageInfo) {
 
 void outputPixels(ImageInfo *imageInfo) {
   printf("%s\n", imageInfo->type);
-  printf("%d %d\n", imageInfo->rows, imageInfo->columns);
+  printf("%d %d\n", imageInfo->columns, imageInfo->rows);
   printf("%d\n", imageInfo->max);
 
   int r, c;
   for (r = 0; r < imageInfo->rows; r++) {
     for (c = 0; c < imageInfo->columns; c++) {
         printf("%d %d %d\n", pixels[r][c][0], pixels[r][c][1], pixels[r][c][2]);
+    }
+  }
+}
+
+void outputPixelsRotated(ImageInfo *imageInfo) {
+  printf("%s\n", imageInfo->type);
+  printf("%d %d\n", imageInfo->rows, imageInfo->columns);
+  printf("%d\n", imageInfo->max);
+
+  int r, c;
+  for (r = 0; r < imageInfo->columns; r++) {
+    for (c = 0; c < imageInfo->rows; c++) {
+        printf("%d %d %d\n", pixelsRotated[r][c][0], pixelsRotated[r][c][1], pixelsRotated[r][c][2]);
     }
   }
 }
@@ -173,6 +207,37 @@ void bluePixels(ImageInfo *imageInfo) {
   }
 }
 
+void rotateRight(ImageInfo *imageInfo) {
+  allocatePixelsRotated(imageInfo);
+
+  int r, c, p;
+  for (r = 0; r < imageInfo->rows; r++) {
+    for (c = 0; c < imageInfo->columns; c++) {
+      for (p = 0; p < 3; p++) {
+        pixelsRotated[c][imageInfo->rows - r - 1][p] = pixels[r][c][p];
+      }
+    }
+  }
+  imageInfo->rotated = TRUE;
+  // int tmp = imageInfo->rows;
+  // imageInfo->rows = imageInfo->columns;
+  // imageInfo->columns = tmp;
+}
+
+void rotateLeft(ImageInfo *imageInfo) {
+  allocatePixelsRotated(imageInfo);
+
+  int r, c, p;
+  for (r = 0; r < imageInfo->rows; r++) {
+    for (c = 0; c < imageInfo->columns; c++) {
+      for (p = 0; p < 3; p++) {
+        pixelsRotated[imageInfo->columns - c - 1][r][p] = pixels[r][c][p];
+      }
+    }
+  }
+  imageInfo->rotated = TRUE;
+}
+
 void freePixels(ImageInfo *imageInfo) {
   int r, c;
   for (r = 0; r < imageInfo->rows; r++) {
@@ -186,24 +251,36 @@ void freePixels(ImageInfo *imageInfo) {
   free(pixels);
 }
 
-void freeMemory(ImageInfo *imageInfo, InputArgsData *input) {
+void freePixelsRotated(ImageInfo *imageInfo) {
+  int r, c;
+  for (r = 0; r < imageInfo->columns; r++) {
+    for (c = 0; c < imageInfo->rows; c++) {
+      free(pixelsRotated[r][c]);
+    }
+  }
+  for (r = 0; r < imageInfo->columns; r++) {
+    free(pixelsRotated[r]);
+  }
+  free(pixelsRotated);
+}
+
+void freeMemory(ImageInfo *imageInfo, InputArgs *input) {
   freePixels(imageInfo);
   free(imageInfo);
   free(input);
 }
 
+
 int main (int argc, char **argv) {
 
-  InputArgsData *input = processInputArgs(argc, argv);
-
+  //structs
+  InputArgs *input = processInputArgs(argc, argv);
   ImageInfo *imageInfo = processImageInfo();
 
-  // char image[100];
-  // fread(&image, 1, 100, stdin);
-  // fprintf(stderr, "%s\n", image);
-
+  //read pixels
   processPixels(imageInfo);
 
+  //conversions
   if (strcmp(input->option, "-I") == 0) {
     invertPixels(imageInfo);
   }
@@ -219,10 +296,31 @@ int main (int argc, char **argv) {
   if (strcmp(input->option, "-blue") == 0) {
     bluePixels(imageInfo);
   }
+  if (strcmp(input->option, "-R") == 0) {
+    rotateRight(imageInfo);
+  }
+  if (strcmp(input->option, "-L") == 0) {
+    rotateLeft(imageInfo);
+  }
 
-  outputPixels(imageInfo);
+  //output            /try to get one output function by swapping width and height
+  if (imageInfo->rotated == FALSE) {
+    outputPixels(imageInfo);
+  } else {
+    outputPixelsRotated(imageInfo);
+    freePixelsRotated(imageInfo);
+  }
 
+  //free
   freeMemory(imageInfo, input);
 
   return 0;
 }
+
+
+
+
+
+// char image[100];
+// fread(&image, 1, 100, stdin);
+// fprintf(stderr, "%s\n", image);
