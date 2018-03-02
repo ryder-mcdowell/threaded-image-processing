@@ -29,6 +29,12 @@ typedef struct ThreadSegment {
   int end;
 } ThreadSegment;
 
+typedef struct ThreadArgs {
+  struct ImageInfo *image;
+  struct ThreadSegment *segment;
+  float contrast;
+} ThreadArgs;
+
 InputArgs *processInputArgs(int argc, char **argv) {
   if (argc < 3 || argc > 4) {
     fprintf(stderr, "usage: ./a.out num_threads option [arg]\n");
@@ -79,13 +85,13 @@ ImageInfo *processImageInfo() {
   return image;
 }
 
-ThreadSegment *createSegments(ImageInfo *image, InputArgs *input) {
-  ThreadSegment *segments = (ThreadSegment *) malloc(sizeof(ThreadSegment) * input->num_threads);
+ThreadSegment *createSegments(ImageInfo *image, int threadCount) {
+  ThreadSegment *segments = (ThreadSegment *) malloc(sizeof(ThreadSegment) * threadCount);
 
-  int segment_length = image->rows / input->num_threads;
+  int segment_length = image->rows / threadCount;
   int i;
-  for (i = 0; i < input->num_threads; i++) {
-    if (i != input->num_threads - 1) {
+  for (i = 0; i < threadCount; i++) {
+    if (i != threadCount - 1) {
       fprintf(stderr, "start: %d| end: %d| diff: %d\n", segment_length * i, segment_length * (i+1), (segment_length * (i+1)) - (segment_length * i));
       segments[i].start = segment_length * i;
       segments[i].end = segment_length * (i+1);
@@ -162,37 +168,56 @@ void outputPixelsRotated(ImageInfo *image) {
   }
 }
 
-void invertPixels(ImageInfo *image) {
+void *invertPixels(void *args) {
+  ThreadArgs *threadArgs = (ThreadArgs *) args;
+  int columns = threadArgs->image->columns;
+  int max = threadArgs->image->max;
+  int start = threadArgs->segment->start;
+  int end = threadArgs->segment->end;
+
   int r, c, p;
-  for (r = 0; r < image->rows; r++) {
-    for (c = 0; c < image->columns; c++) {
+  for (r = start; r < end; r++) {
+    for (c = 0; c < columns; c++) {
       for (p = 0; p < 3; p++) {
-        pixels[r][c][p] = image->max - pixels[r][c][p];
+        pixels[r][c][p] = max - pixels[r][c][p];
       }
     }
   }
+  return NULL;
 }
 
-void contrastPixels(ImageInfo *image, float contrast) {
+void *contrastPixels(void *args) {
+  ThreadArgs *threadArgs = (ThreadArgs *) args;
+  int columns = threadArgs->image->columns;
+  int max = threadArgs->image->max;
+  float contrast = threadArgs->contrast;
+  int start = threadArgs->segment->start;
+  int end = threadArgs->segment->end;
+
   int r, c, p;
-  for (r = 0; r < image->rows; r++) {
-    for (c = 0; c < image->columns; c++) {
+  for (r = start; r < end; r++) {
+    for (c = 0; c < columns; c++) {
       for (p = 0; p < 3; p++) {
-        if (pixels[r][c][p] <= (image->max / 2)) {
-          pixels[r][c][p] -= image->max * contrast;
+        if (pixels[r][c][p] <= (max / 2)) {
+          pixels[r][c][p] -= max * contrast;
         } else {
-          pixels[r][c][p] += image->max * contrast;
+          pixels[r][c][p] += max * contrast;
         }
       }
     }
   }
+  return NULL;
 }
 
-void *redPixels(ImageInfo *image) {
+void *redPixels(void *args) {
+  ThreadArgs *threadArgs = (ThreadArgs *) args;
+  int columns = threadArgs->image->columns;
+  int start = threadArgs->segment->start;
+  int end = threadArgs->segment->end;
+
   int r, c, p;
-  //r = segment->start ; r < segment->end
-  for (r = 0; r < image->rows; r++) {
-    for (c = 0; c < image->columns; c++) {
+  for (r = start; r < end; r++) {
+    for (c = 0; c < columns; c++) {
       for (p = 0; p < 3; p++) {
         if (p != 0) {
           pixels[r][c][p] = 0;
@@ -200,12 +225,18 @@ void *redPixels(ImageInfo *image) {
       }
     }
   }
+  return NULL;
 }
 
-void greenPixels(ImageInfo *image) {
+void *greenPixels(void *args) {
+  ThreadArgs *threadArgs = (ThreadArgs *) args;
+  int columns = threadArgs->image->columns;
+  int start = threadArgs->segment->start;
+  int end = threadArgs->segment->end;
+
   int r, c, p;
-  for (r = 0; r < image->rows; r++) {
-    for (c = 0; c < image->columns; c++) {
+  for (r = start; r < end; r++) {
+    for (c = 0; c < columns; c++) {
       for (p = 0; p < 3; p++) {
         if (p != 1) {
           pixels[r][c][p] = 0;
@@ -213,12 +244,18 @@ void greenPixels(ImageInfo *image) {
       }
     }
   }
+  return NULL;
 }
 
-void bluePixels(ImageInfo *image) {
+void *bluePixels(void *args) {
+  ThreadArgs *threadArgs = (ThreadArgs *) args;
+  int columns = threadArgs->image->columns;
+  int start = threadArgs->segment->start;
+  int end = threadArgs->segment->end;
+
   int r, c, p;
-  for (r = 0; r < image->rows; r++) {
-    for (c = 0; c < image->columns; c++) {
+  for (r = start; r < end; r++) {
+    for (c = 0; c < columns; c++) {
       for (p = 0; p < 3; p++) {
         if (p != 2) {
           pixels[r][c][p] = 0;
@@ -226,37 +263,64 @@ void bluePixels(ImageInfo *image) {
       }
     }
   }
+  return NULL;
 }
 
-void rotateRight(ImageInfo *image) {
-  allocatePixelsRotated(image);
+void *rotateRight(void *args) {
+  ThreadArgs *threadArgs = (ThreadArgs *) args;
+  int columns = threadArgs->image->columns;
+  int rows = threadArgs->image->rows;
+  int start = threadArgs->segment->start;
+  int end = threadArgs->segment->end;
 
+  fprintf(stderr, "start: %d| end: %d| col: %d\n", start, end, columns);
   int r, c, p;
-  for (r = 0; r < image->rows; r++) {
-    for (c = 0; c < image->columns; c++) {
+  for (r = start; r < end; r++) {
+    for (c = 0; c < columns; c++) {
       for (p = 0; p < 3; p++) {
-        pixelsRotated[c][image->rows - r - 1][p] = pixels[r][c][p];
+        pixelsRotated[c][rows - r - 1][p] = pixels[r][c][p];
       }
     }
   }
-  image->rotated = TRUE;
-  // int tmp = image->rows;
-  // image->rows = image->columns;
-  // image->columns = tmp;
+  threadArgs->image->rotated = TRUE;
+  return NULL;
 }
 
-void rotateLeft(ImageInfo *image) {
-  allocatePixelsRotated(image);
+void *rotateLeft(void *args) {
+  ThreadArgs *threadArgs = (ThreadArgs *) args;
+  int columns = threadArgs->image->columns;
+  int start = threadArgs->segment->start;
+  int end = threadArgs->segment->end;
 
+  fprintf(stderr, "start: %d| end: %d| col: %d\n", start, end, columns);
   int r, c, p;
-  for (r = 0; r < image->rows; r++) {
-    for (c = 0; c < image->columns; c++) {
+  for (r = start; r < end; r++) {
+    for (c = 0; c < columns; c++) {
       for (p = 0; p < 3; p++) {
-        pixelsRotated[image->columns - c - 1][r][p] = pixels[r][c][p];
+        pixelsRotated[columns - c - 1][r][p] = pixels[r][c][p];
       }
     }
   }
-  image->rotated = TRUE;
+  threadArgs->image->rotated = TRUE;
+  return NULL;
+}
+
+void callThreads(void *option, InputArgs *input, ImageInfo *image) {
+  pthread_t *threads = (pthread_t *) malloc(sizeof(pthread_t) * input->num_threads);
+
+  ThreadSegment *segments = createSegments(image, input->num_threads);
+
+  ThreadArgs *args = (ThreadArgs *) malloc(sizeof(ThreadArgs));
+  args->image = image;
+  args->contrast = input->contrast;
+
+  fprintf(stderr, "---------------------\n");
+  int i;
+  for (i = 0; i < input->num_threads; i++) {
+    args->segment = &segments[i];
+    pthread_create(&threads[i], NULL, option, (void *) args);
+    pthread_join(threads[i], NULL);
+  }
 }
 
 void freePixels(ImageInfo *image) {
@@ -294,6 +358,7 @@ void freeMemory(ImageInfo *image, InputArgs *input) {
 
 int main (int argc, char **argv) {
   //error check mallocs
+  //free ThreadSegment and ThreadArgs
 
   //structs
   InputArgs *input = processInputArgs(argc, argv);
@@ -302,38 +367,29 @@ int main (int argc, char **argv) {
   //read pixels
   processPixels(image);
 
-  //allocate threads
-  pthread_t *threads = (pthread_t *) malloc(sizeof(pthread_t) * input->num_threads);
-  //create segments
-  ThreadSegment *segments = createSegments(image, input);
-  //create threads
-  int i;
-  for (i = 0; i < input->num_threads; i++) {
-    pthread_create(&threads[i], NULL, function*, function args)
-  }
-
-
   //conversions
   if (strcmp(input->option, "-I") == 0) {
-    invertPixels(image);
+    callThreads(invertPixels, input, image);
   }
   if (strcmp(input->option, "-C") == 0) {
-    contrastPixels(image, input->contrast);
+    callThreads(contrastPixels, input, image);
   }
   if (strcmp(input->option, "-red") == 0) {
-    redPixels(image);
+    callThreads(redPixels, input, image);
   }
   if (strcmp(input->option, "-green") == 0) {
-    greenPixels(image);
+    callThreads(greenPixels, input, image);
   }
   if (strcmp(input->option, "-blue") == 0) {
-    bluePixels(image);
+    callThreads(bluePixels, input, image);
   }
   if (strcmp(input->option, "-R") == 0) {
-    rotateRight(image);
+    allocatePixelsRotated(image);
+    callThreads(rotateRight, input, image);
   }
   if (strcmp(input->option, "-L") == 0) {
-    rotateLeft(image);
+    allocatePixelsRotated(image);
+    callThreads(rotateLeft, input, image);
   }
 
   //output            /try to get one output function by swapping width and height
