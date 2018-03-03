@@ -361,7 +361,6 @@ void callThreads(void *option, InputArgs *input, ImageInfo *image) {
   args->contrast = input->contrast;
 
   //create thread, call conversion, close thread
-  fprintf(stderr, "---------------------\n");
   int i;
   for (i = 0; i < input->num_threads; i++) {
     args->segment = &segments[i];
