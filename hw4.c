@@ -15,7 +15,6 @@ typedef struct InputArgs {
   char *option;
   float contrast;
 } InputArgs;
-
 typedef struct ImageInfo {
   char type[10];
   int rows;
@@ -23,17 +22,88 @@ typedef struct ImageInfo {
   int max;
   int rotated;
 } ImageInfo;
-
 typedef struct ThreadSegment {
   int start;
   int end;
 } ThreadSegment;
-
 typedef struct ThreadArgs {
   struct ImageInfo *image;
   struct ThreadSegment *segment;
   float contrast;
 } ThreadArgs;
+
+InputArgs *processInputArgs(int argc, char **argv);
+ImageInfo *processImageInfo();
+ThreadSegment *createSegments(ImageInfo *image, int threadCount);
+void allocatePixels(ImageInfo *image);
+void allocatePixelsRotated(ImageInfo *image);
+void processPixels(ImageInfo *image);
+void outputPixels(ImageInfo *image);
+void outputPixelsRotated(ImageInfo *image);
+void *invertPixels(void *args);
+void *contrastPixels(void *args);
+void *redPixels(void *args);
+void *greenPixels(void *args);
+void *bluePixels(void *args);
+void *rotateRight(void *args);
+void *rotateLeft(void *args);
+void callThreads(void *option, InputArgs *input, ImageInfo *image);
+void freePixels(ImageInfo *image);
+void freePixelsRotated(ImageInfo *image);
+
+int main (int argc, char **argv) {
+  //structs
+  InputArgs *input = processInputArgs(argc, argv);
+  ImageInfo *image = processImageInfo();
+
+  //read pixels
+  processPixels(image);
+
+  //conversions
+  if (strcmp(input->option, "-I") == 0) {
+    callThreads(invertPixels, input, image);
+
+  } else if (strcmp(input->option, "-C") == 0) {
+    callThreads(contrastPixels, input, image);
+
+  } else if (strcmp(input->option, "-red") == 0) {
+    callThreads(redPixels, input, image);
+
+  } else if (strcmp(input->option, "-green") == 0) {
+    callThreads(greenPixels, input, image);
+
+  } else if (strcmp(input->option, "-blue") == 0) {
+    callThreads(bluePixels, input, image);
+
+  } else if (strcmp(input->option, "-R") == 0) {
+    allocatePixelsRotated(image);
+    callThreads(rotateRight, input, image);
+
+  } else if (strcmp(input->option, "-L") == 0) {
+    allocatePixelsRotated(image);
+    callThreads(rotateLeft, input, image);
+
+  } else {
+    fprintf(stderr, "ERROR: unrecognized conversion option\n");
+    exit(1);
+  }
+
+  //output
+  if (image->rotated == FALSE) {
+    outputPixels(image);
+    freePixels(image);
+  } else {
+    outputPixelsRotated(image);
+    freePixelsRotated(image);
+  }
+
+  //free image/input memory
+  free(image);
+  free(input);
+
+  return 0;
+}
+
 
 InputArgs *processInputArgs(int argc, char **argv) {
   //read/check input arguments and store
@@ -47,12 +117,21 @@ InputArgs *processInputArgs(int argc, char **argv) {
       exit(1);
     }
     input->num_threads = atoi(argv[1]);
+    if (input->num_threads < 1) {
+      fprintf(stderr, "ERROR: must give a positive integer for thread amount\n");
+      exit(1);
+    }
     input->option = argv[2];
     if (argc == 4) {
-      if (atof(argv[3]) > 0 && atof(argv[3]) < 1) {
-        input->contrast = atof(argv[3]);
+      if (strcmp(input->option, "-C") == 0) {
+        if (atof(argv[3]) > 0 && atof(argv[3]) < 1) {
+          input->contrast = atof(argv[3]);
+        } else {
+          fprintf(stderr, "ERROR: contrast value must be between 0 and 1\n");
+          exit(1);
+        }
       } else {
-        fprintf(stderr, "ERROR: contrast value must be between 0 and 1\n");
+        fprintf(stderr, "ERROR: contrast value argument can only be used with -C option\n");
         exit(1);
       }
     }
@@ -399,56 +478,4 @@ void freePixelsRotated(ImageInfo *image) {
     free(pixelsRotated[r]);
   }
   free(pixelsRotated);
-}
-
-
-int main (int argc, char **argv) {
-  //free ThreadSegment and ThreadArgs
-
-  //structs
-  InputArgs *input = processInputArgs(argc, argv);
-  ImageInfo *image = processImageInfo();
-
-  //read pixels
-  processPixels(image);
-
-  //conversions
-  if (strcmp(input->option, "-I") == 0) {
-    callThreads(invertPixels, input, image);
-  }
-  if (strcmp(input->option, "-C") == 0) {
-    callThreads(contrastPixels, input, image);
-  }
-  if (strcmp(input->option, "-red") == 0) {
-    callThreads(redPixels, input, image);
-  }
-  if (strcmp(input->option, "-green") == 0) {
-    callThreads(greenPixels, input, image);
-  }
-  if (strcmp(input->option, "-blue") == 0) {
-    callThreads(bluePixels, input, image);
-  }
-  if (strcmp(input->option, "-R") == 0) {
-    allocatePixelsRotated(image);
-    callThreads(rotateRight, input, image);
-  }
-  if (strcmp(input->option, "-L") == 0) {
-    allocatePixelsRotated(image);
-    callThreads(rotateLeft, input, image);
-  }
-
-  //output
-  if (image->rotated == FALSE) {
-    outputPixels(image);
-    freePixels(image);
-  } else {
-    outputPixelsRotated(image);
-    freePixelsRotated(image);
-  }
-
-  //free image/input memory
-  free(image);
-  free(input);
-
-  return 0;
 }
