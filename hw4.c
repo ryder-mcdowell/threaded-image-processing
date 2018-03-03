@@ -102,11 +102,9 @@ ThreadSegment *createSegments(ImageInfo *image, int threadCount) {
   int i;
   for (i = 0; i < threadCount; i++) {
     if (i != threadCount - 1) {
-      fprintf(stderr, "start: %d| end: %d| diff: %d\n", segment_length * i, segment_length * (i+1), (segment_length * (i+1)) - (segment_length * i));
       segments[i].start = segment_length * i;
       segments[i].end = segment_length * (i+1);
     } else {
-      fprintf(stderr, "start: %d| end: %d| diff: %d\n", segment_length * i, image->rows, image->rows - (segment_length * i));
       segments[i].start = segment_length * i;
       segments[i].end = image->rows;
     }
@@ -310,7 +308,6 @@ void *rotateRight(void *args) {
   int end = threadArgs->segment->end;
 
   //rotate right
-  fprintf(stderr, "start: %d| end: %d| col: %d\n", start, end, columns);
   int r, c, p;
   for (r = start; r < end; r++) {
     for (c = 0; c < columns; c++) {
@@ -331,7 +328,6 @@ void *rotateLeft(void *args) {
   int end = threadArgs->segment->end;
 
   //rotate left
-  fprintf(stderr, "start: %d| end: %d| col: %d\n", start, end, columns);
   int r, c, p;
   for (r = start; r < end; r++) {
     for (c = 0; c < columns; c++) {
@@ -374,9 +370,6 @@ void callThreads(void *option, InputArgs *input, ImageInfo *image) {
   }
 
   //free thread/segment memory
-  // for (i = 0; i < input->num_threads; i++) {
-  //   free(&threads[i]);
-  // }
   free(threads);
   free(segments);
   free(args);
